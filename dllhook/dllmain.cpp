@@ -1,6 +1,8 @@
 // dllmain.cpp : 定义 DLL 应用程序的入口点。
 #include "stdafx.h"
 
+TCHAR RptPath[MAX_PATH];
+
 struct MEMINFO
 {
 	std::vector<std::string> stack;
@@ -9,8 +11,13 @@ struct MEMINFO
 
 void GenRpt()
 {
-	std::ifstream infile("memleak.log");
-	std::ofstream outfile("memleak.rpt");
+	_bstr_t b(RptPath);
+	std::string path1 = b;
+	std::string path2 = path1.substr(4);
+	std::ifstream infile(path2);
+	std::string path3 = path2.substr(0, path2.rfind("\\")+1);
+	path3 += "memleak.rpt";
+	std::ofstream outfile(path3);
 	std::string line;
 	std::map<void*, MEMINFO> memtbl;
 	int linecount = 0;
@@ -111,6 +118,8 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 		{
 			DWORD dwPos = SetFilePointer(plog, 0, NULL, FILE_END);
 		}
+		
+		GetFinalPathNameByHandle(plog, RptPath, MAX_PATH, FILE_NAME_NORMALIZED);
 		DetourRestoreAfterWith();
 		DetourTransactionBegin();
 		DetourUpdateThread(GetCurrentThread());
