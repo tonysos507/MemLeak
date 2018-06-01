@@ -2,15 +2,12 @@
 //
 
 #include "stdafx.h"
-#include <Windows.h>
-#include <WinBase.h>
-#include <DbgHelp.h>
-#include <stdlib.h>
-#include <stdio.h>
 
-#define MAX_STACK_DEPTH 32
+
+
 
 HANDLE hProc;
+std::vector<BACKTRACEINFO> backtracetbl;
 
 BOOL CALLBACK ReadProcMem(HANDLE hProcess, DWORD64 qwBaseAddress, PVOID lpBuffer, DWORD nSize, LPDWORD lpNumberOfBytesRead)
 {
@@ -20,22 +17,13 @@ BOOL CALLBACK ReadProcMem(HANDLE hProcess, DWORD64 qwBaseAddress, PVOID lpBuffer
 	*lpNumberOfBytesRead = (DWORD)st;
 	if (bRet == 0)
 	{
-		printf("error %d\n", GetLastError());
+		printf("ReadProcMem - error %d\n", GetLastError());
 	}
 	return bRet;
 }
 
 bool checkAPI()
 {
-	PVOID stackStart[MAX_STACK_DEPTH];
-	DWORD dwHashCode = 0;
-	USHORT frames = CaptureStackBackTrace((ULONG)0, (ULONG)10, stackStart, &dwHashCode);
-	printf("No of frames found %d, hash code %d\n", frames, dwHashCode);
-
-	hProc = GetCurrentProcess();
-	SymInitialize(hProc, NULL, TRUE);
-	HANDLE hThread = GetCurrentThread();
-	STACKFRAME64 stackframe;
 	CONTEXT context;
 	memset(&context, 0, sizeof(context));
 	context.ContextFlags = CONTEXT_FULL;
@@ -45,6 +33,14 @@ bool checkAPI()
 	__asm		mov context.Ebp, ebp
 	__asm		mov context.Esp, esp
 
+	PVOID stackStart[MAX_STACK_DEPTH];
+	DWORD dwHashCode = 0;
+	USHORT frames = CaptureStackBackTrace((ULONG)0, (ULONG)10, stackStart, &dwHashCode);
+	printf("No of frames found %d, hash code %d\n", frames, dwHashCode);
+
+
+	HANDLE hThread = GetCurrentThread();
+	STACKFRAME64 stackframe;
 	memset(&stackframe, 0, sizeof(stackframe));
 	stackframe.AddrPC.Offset = context.Eip;
 	stackframe.AddrPC.Mode = AddrModeFlat;
@@ -53,29 +49,14 @@ bool checkAPI()
 	stackframe.AddrFrame.Offset = context.Ebp;
 	stackframe.AddrFrame.Mode = AddrModeFlat;
 
-	IMAGEHLP_SYMBOL *pSym = NULL;
-	pSym = (IMAGEHLP_SYMBOL*)malloc(sizeof(IMAGEHLP_SYMBOL) + 1024);
-	memset(pSym, 0, sizeof(IMAGEHLP_SYMBOL) + 1024);
-	pSym->SizeOfStruct = sizeof(IMAGEHLP_SYMBOL);
-	pSym->MaxNameLength = 1024;
-	DWORD offsetFromSymbol;
-	CHAR name[1024];
-
 	for (int frameNum = 0; ; frameNum)
 	{
-		if (!StackWalk64(IMAGE_FILE_MACHINE_I386, hProc, hThread, &stackframe, &context, ReadProcMem, SymFunctionTableAccess64, SymGetModuleBase64, NULL))
+		if (!StackWalk64(IMAGE_FILE_MACHINE_I386, hProc, hThread, &stackframe, &context, NULL, NULL, NULL, NULL))
 			break;
 
 		if (stackframe.AddrPC.Offset != 0)
 		{
-			if (SymGetSymFromAddr(hProc, stackframe.AddrPC.Offset, &offsetFromSymbol, pSym))
-			{
-				strncpy_s(name, 1024, pSym->Name, _TRUNCATE);
-				name[1024 - 1] = 0;
-				printf("%s\n", name);
-			}
-			else
-				printf("error %d\n", GetLastError());
+			backtracetbl.push_back({ stackframe });
 		}
 	}
 
@@ -85,7 +66,43 @@ bool checkAPI()
 
 int main()
 {
+	hProc = GetCurrentProcess();
+	SymInitialize(hProc, NULL, TRUE);
 	checkAPI();
+
+	DWORD offsetFromSymbol;
+	IMAGEHLP_SYMBOL *pSym = NULL;
+	pSym = (IMAGEHLP_SYMBOL*)malloc(sizeof(IMAGEHLP_SYMBOL) + 1024);
+	memset(pSym, 0, sizeof(IMAGEHLP_SYMBOL) + 1024);
+	pSym->SizeOfStruct = sizeof(IMAGEHLP_SYMBOL);
+	pSym->MaxNameLength = 1024;
+
+	CHAR name[1024] = { 0 };
+	for (std::vector<BACKTRACEINFO>::iterator it = backtracetbl.begin(); it != backtracetbl.end(); it++)
+	{
+		DWORD offsetFromline;
+		IMAGEHLP_LINE line;
+		memset(&line, 0, sizeof(line));
+		line.SizeOfStruct = sizeof(line);
+		IMAGEHLP_MODULE modinfo = { 0 };
+		modinfo.SizeOfStruct = sizeof(IMAGEHLP_MODULE);
+		if (SymGetLineFromAddr(hProc, it->sf.AddrPC.Offset, &offsetFromline, &line) != FALSE)
+		{
+		}
+
+		if (SymGetSymFromAddr(hProc, it->sf.AddrPC.Offset, &offsetFromSymbol, pSym))
+		{
+		}
+
+		if (SymGetModuleInfo(hProc, it->sf.AddrPC.Offset, &modinfo) == FALSE)
+			printf("SymGetModuleInfo error %d\n", GetLastError());
+
+		snprintf(name, 1024, "%s!%s(%d):%s", modinfo.LoadedImageName, line.FileName, line.LineNumber, pSym->Name);
+		printf("%s\n", name);
+		memset(name, 0, 1024);
+	}
+
+
     return 0;
 }
 

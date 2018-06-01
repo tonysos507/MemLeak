@@ -41,14 +41,13 @@ inline size_t OnWriteData(const void* lpBuffer, size_t nItemSize, size_t nItemCo
     int iResult = curl_easy_perform(pcURL); curl_easy_getinfo(pcURL, CURLINFO_RESPONSE_CODE, (responsecode));\
     curl_easy_cleanup(pcURL); return iResult;
 
-inline int HTTP_POST(const std::string& szURL, const std::string& szCookie, const std::string& szPostData, std::string& szHeader, std::string& szResponse, int& iResponseCode)
+int HTTP_POST(const std::string& szURL, const std::string& szCookie, const std::string& szPostData, std::string& szHeader, std::string& szResponse, int& iResponseCode)
 {
 	HTTP_FORMAT(szURL.c_str(), szCookie.c_str(), szPostData.c_str(), NULL, HTTP_TIMEOUT, (void*)&szHeader, (void*)&szResponse, &iResponseCode);
 }
 
 int main()
 {
-	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
 	{
 		std::string szUrl = "http://192.168.0.207:10000/streaming/start";
@@ -60,8 +59,6 @@ int main()
 		int iHttpRet = HTTP_POST(szUrl.c_str(), szCookie, szPostData.c_str(), szHeader, szResponse, iResponseCode);
 	}
 
-
-	_CrtDumpMemoryLeaks();
     return 0;
 }
 

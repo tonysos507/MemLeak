@@ -19,6 +19,11 @@
 #include <stdio.h>
 #include "stdlib.h"
 #include "detours.h"
+#include <DbgHelp.h>
+#include <vector>
+#include <map>
+#include <fstream>
+#include <sstream>
 
 extern void* (__cdecl* Truemalloc)(_In_ _CRT_GUARDOVERFLOW size_t _Size);
 extern void(__cdecl* Truefree)(_Pre_maybenull_ _Post_invalid_ void* _Block);
@@ -26,3 +31,4 @@ void* __cdecl mymalloc(_In_ _CRT_GUARDOVERFLOW size_t _Size);
 void __cdecl myfree(_Pre_maybenull_ _Post_invalid_ void* _Block);
 
 extern HANDLE plog;
+extern HANDLE hProc;

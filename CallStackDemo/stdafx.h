@@ -13,3 +13,17 @@
 
 
 // TODO:  在此处引用程序需要的其他头文件
+
+#include <Windows.h>
+#include <WinBase.h>
+#include <DbgHelp.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <vector>
+
+#define MAX_STACK_DEPTH 32
+
+typedef struct _BacktraceInfo
+{
+	STACKFRAME64 sf;
+}BACKTRACEINFO, *PBACKTRACEINFO;
